@@ -1,5 +1,8 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. Backalley.
+       AUTHOR-ID. Oshaboy.
+       DATE-WRITTEN. 2025-12-06.
+      *Remarks. A breakout clone I wrote in COBOL.
        ENVIRONMENT DIVISION.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
