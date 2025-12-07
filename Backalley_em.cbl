@@ -3,6 +3,85 @@
        AUTHOR. Oshaboy.
        DATE-WRITTEN. 2025-12-06.
       *Remarks. A breakout clone I wrote in COBOL.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       78 SIZEOF_INT VALUE LENGTH OF BINARY-INT.  
+       78 WS_SCREEN_WIDTH VALUE 800.
+       78 WS_SCREEN_HEIGHT VALUE 600.
+       78 WS_SDL_INIT_EVERYTHING VALUE 62001.
+       78 WS_WINDOWPOS_CENTERED VALUE 805240832.
+       78 WS_INITIAL_BRICK_COUNT VALUE 40.
+       78 WS_BRICK_WIDTH VALUE 70.
+       78 WS_BRICK_HEIGHT VALUE 30.
+       01 WS_MAINLOOP USAGE PROGRAM-POINTER.
+       01 WS_WINDOW_TITLE PIC X(10) VALUE Z'Backalley'.
+       01 WS_WINDOW GLOBAL USAGE POINTER.
+       01 WS_RENDERER GLOBAL USAGE POINTER.
+
+       01 WS_BRICKS GLOBAL OCCURS WS_INITIAL_BRICK_COUNT
+                    INDEXED BY WS_BRICKS_I.
+           02 WS_BRICK.
+               03 WS_BRICK_STATUS PIC 9.
+                   88 WS_BRICK_EXISTS VALUE 0.
+                   88 WS_BRICK_DESTROYED VALUE 1.
+               03 WS_BRICK_RECT .
+                   04 X USAGE BINARY-INT.
+                   04 Y USAGE BINARY-INT.
+                   04 W USAGE BINARY-INT.
+                   04 H USAGE BINARY-INT.
+       PROCEDURE DIVISION.
+       MAIN SECTION.
+           PERFORM INIT
+           SET WS_MAINLOOP TO ENTRY 'BackalleyMainloop'
+           CALL STATIC 'emscripten_set_main_loop' USING
+               BY VALUE WS_MAINLOOP
+               BY VALUE SIZE SIZEOF_INT 60
+               BY VALUE SIZE SIZEOF_INT 1
+           END-CALL
+           PERFORM UNTIL 0 = 1
+               CALL STATIC 'BackalleyMainloop' END-CALL
+           END-PERFORM.
+
+       INIT SECTION.
+           CALL STATIC 'SDL_Init' USING
+               BY VALUE SIZE SIZEOF_INT WS_SDL_INIT_EVERYTHING
+           END-CALL
+           CALL STATIC 'SDL_CreateWindowAndRenderer' USING 
+               BY VALUE SIZE SIZEOF_INT WS_SCREEN_WIDTH 
+               BY VALUE SIZE SIZEOF_INT WS_SCREEN_HEIGHT 
+               BY VALUE SIZE SIZEOF_INT 0
+               BY REFERENCE WS_WINDOW
+               BY REFERENCE WS_RENDERER 
+           END-CALL
+           CALL STATIC 'SDL_SetWindowTitle' USING
+               BY VALUE WS_WINDOW
+               BY REFERENCE WS_WINDOW_TITLE
+               RETURNING NOTHING
+           END-CALL
+           CALL STATIC 'SDL_SetWindowPosition' USING
+               BY VALUE WS_WINDOW
+               BY VALUE SIZE SIZEOF_INT WS_WINDOWPOS_CENTERED
+               BY VALUE SIZE SIZEOF_INT WS_WINDOWPOS_CENTERED
+               RETURNING NOTHING
+           END-CALL
+           PERFORM VARYING WS_BRICKS_I FROM 0 
+                                       BY   1
+                             UNTIL WS_BRICKS_I >= WS_INITIAL_BRICK_COUNT
+           
+               SET WS_BRICK_EXISTS(WS_BRICKS_I + 1) TO TRUE
+               COMPUTE X IN WS_BRICK_RECT(WS_BRICKS_I + 1) = 
+                   (FUNCTION MOD(WS_BRICKS_I 8) * 
+                       (WS_BRICK_WIDTH + 10)) + 80
+               COMPUTE Y IN WS_BRICK_RECT(WS_BRICKS_I + 1) =
+                   FUNCTION INTEGER(WS_BRICKS_I / 8)
+                       * (WS_BRICK_HEIGHT + 10) + 40
+               MOVE WS_BRICK_HEIGHT
+                   TO H IN WS_BRICK_RECT(WS_BRICKS_I + 1)
+               MOVE WS_BRICK_WIDTH
+                   TO W IN WS_BRICK_RECT(WS_BRICKS_I + 1)
+           END-PERFORM.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. BackalleyMainloop.
        ENVIRONMENT DIVISION.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
@@ -17,8 +96,6 @@
        78 WS_SCREEN_HEIGHT VALUE 600.
        78 WS_LIVES_POSITION_X VALUE 700.
        78 WS_LIVES_POSITION_Y VALUE 580.
-       78 WS_SDL_INIT_EVERYTHING VALUE 62001.
-       78 WS_WINDOWPOS_CENTERED VALUE 805240832.
        78 SIZEOF_INT VALUE LENGTH OF BINARY-INT.  
        78 WS_BRICK_WIDTH VALUE 70.
        78 WS_BRICK_HEIGHT VALUE 30.
@@ -29,10 +106,7 @@
        01 WS_TIME_OF_LAST_BALL PIC 9(10) VALUE 0.
        01 WS_TIME_SINCE_LAST_BALL PIC 9(10) VALUE 0.
        01 WS_WAIT_TIME PIC S9(10).
-       01 WS_WINDOW_TITLE PIC X(10) VALUE Z'Backalley'.
        01 WS_THANKS PIC X(19) VALUE 'Thanks for playing!'.
-       01 WS_WINDOW USAGE POINTER.
-       01 WS_RENDERER USAGE POINTER.
            
        01 WS_MOUSE_POSITION_X PIC 9(3).
        01 WS_EXIT_STATUS PIC 9 VALUE 0.
@@ -104,17 +178,7 @@
            88 WS_EVENT_PENDING VALUE 1.
        01 WS_BALL_SPEED PIC 99 VALUE 2.
        01 WS_TOTAL_BRICKS PIC 99 VALUE WS_INITIAL_BRICK_COUNT.
-       01 WS_BRICKS OCCURS WS_INITIAL_BRICK_COUNT
-                    INDEXED BY WS_BRICKS_I.
-           02 WS_BRICK.
-               03 WS_BRICK_STATUS PIC 9.
-                   88 WS_BRICK_EXISTS VALUE 0.
-                   88 WS_BRICK_DESTROYED VALUE 1.
-               03 WS_BRICK_RECT.
-                   04 X USAGE BINARY-INT.
-                   04 Y USAGE BINARY-INT.
-                   04 W USAGE BINARY-INT.
-                   04 H USAGE BINARY-INT.
+
        01 WS_GAME_STATE PIC 9 VALUE 0.
            88 WS_PLAYING VALUE 0.
            88 WS_WIN VALUE 1.
@@ -131,54 +195,18 @@
 
        PROCEDURE DIVISION.
        MAIN SECTION.
-           PERFORM INIT
-           PERFORM UNTIL WS_EXIT
-               PERFORM INPUT_HANDLING
-               PERFORM STATE_HANDLING
-               PERFORM IDLE
-               PERFORM DRAW
-               PERFORM STATE_CHECK
-           END-PERFORM
-           PERFORM CLEANUP
-           STOP RUN.
-       INIT SECTION.
-           CALL STATIC 'SDL_Init' USING
-               BY VALUE SIZE SIZEOF_INT WS_SDL_INIT_EVERYTHING
-           END-CALL
-           CALL STATIC 'SDL_CreateWindowAndRenderer' USING 
-               BY VALUE SIZE SIZEOF_INT WS_SCREEN_WIDTH 
-               BY VALUE SIZE SIZEOF_INT WS_SCREEN_HEIGHT 
-               BY VALUE SIZE SIZEOF_INT 2
-               BY REFERENCE WS_WINDOW
-               BY REFERENCE WS_RENDERER 
-           END-CALL
-           CALL STATIC 'SDL_SetWindowTitle' USING
-               BY VALUE WS_WINDOW
-               BY REFERENCE WS_WINDOW_TITLE
-               RETURNING NOTHING
-           END-CALL
-           CALL STATIC 'SDL_SetWindowPosition' USING
-               BY VALUE WS_WINDOW
-               BY VALUE SIZE SIZEOF_INT WS_WINDOWPOS_CENTERED
-               BY VALUE SIZE SIZEOF_INT WS_WINDOWPOS_CENTERED
-               RETURNING NOTHING
-           END-CALL
-           PERFORM VARYING WS_BRICKS_I FROM 0 
-                                       BY   1
-                             UNTIL WS_BRICKS_I >= WS_INITIAL_BRICK_COUNT
-           
-               SET WS_BRICK_EXISTS(WS_BRICKS_I + 1) TO TRUE
-               COMPUTE X IN WS_BRICK_RECT(WS_BRICKS_I + 1) = 
-                   (FUNCTION MOD(WS_BRICKS_I 8) * 
-                       (WS_BRICK_WIDTH + 10)) + 80
-               COMPUTE Y IN WS_BRICK_RECT(WS_BRICKS_I + 1) =
-                   FUNCTION INTEGER(WS_BRICKS_I / 8)
-                       * (WS_BRICK_HEIGHT + 10) + 40
-               MOVE WS_BRICK_HEIGHT
-                   TO H IN WS_BRICK_RECT(WS_BRICKS_I + 1)
-               MOVE WS_BRICK_WIDTH
-                   TO W IN WS_BRICK_RECT(WS_BRICKS_I + 1)
-           END-PERFORM.
+           IF WS_EXIT
+           THEN
+               PERFORM CLEANUP
+               STOP RUN
+           END-IF
+           PERFORM INPUT_HANDLING
+           PERFORM STATE_HANDLING
+      *    PERFORM IDLE
+           PERFORM DRAW
+           PERFORM STATE_CHECK
+           GOBACK.
+
 
        CLEANUP SECTION.
            CALL STATIC 'SDL_RenderClear' USING
@@ -392,6 +420,7 @@
                        Y IN WS_BALL_POSITION <
                            Y IN WS_BRICK_RECT(WS_BRICKS_I) +
                                WS_BRICK_HEIGHT
+                           
                            SUBTRACT 1 FROM WS_TOTAL_BRICKS
                            SET WS_BRICK_DESTROYED(WS_BRICKS_I) TO TRUE
 
@@ -429,24 +458,6 @@
            THEN
                ADD 1 TO WS_BALL_SPEED
            END-IF.
-
-
-       IDLE SECTION.
-           
-           CALL STATIC 'SDL_GetTicks'
-               RETURNING WS_SDL_TICKS
-           END-CALL
-           COMPUTE WS_WAIT_TIME =
-               17 - (WS_SDL_TICKS - WS_TIME_OF_LAST_FRAME)
-           IF WS_WAIT_TIME > 0 
-           THEN 
-               CALL STATIC 'SDL_Delay' 
-                   USING BY VALUE SIZE SIZEOF_INT WS_WAIT_TIME
-               END-CALL
-           END-IF
-           CALL STATIC 'SDL_GetTicks'
-               RETURNING WS_TIME_OF_LAST_FRAME
-           END-CALL.
        STATE_CHECK SECTION.
            IF WS_PLAYING
            THEN
@@ -460,4 +471,5 @@
                END-IF
            END-IF.
                
+       END PROGRAM BackalleyMainloop.
        END PROGRAM Backalley.
